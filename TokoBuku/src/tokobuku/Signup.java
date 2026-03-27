@@ -89,6 +89,7 @@ public class Signup extends JFrame {
 
             if (user.equals("admin") && pass.equals("admin123")) {
                 JOptionPane.showMessageDialog(this, "Selamat Datang Admin");
+                new Admin();
             } else if (user.equals("kasir") && pass.equals("kasir123")) {
                 JOptionPane.showMessageDialog(this, "Selamat Datang Kasir");
             } else {
