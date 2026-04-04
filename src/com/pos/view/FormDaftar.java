@@ -1,4 +1,4 @@
-package tokobuku;
+package com.pos.view;
 
 import java.awt.*;
 import javax.swing.*;
