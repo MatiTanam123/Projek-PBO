@@ -1,7 +1,22 @@
 package com.pos.view;
 
-import java.awt.*;
-import javax.swing.*;
+import java.awt.Color;
+import java.awt.Font;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+
+import javax.swing.BorderFactory;
+import javax.swing.JButton;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JOptionPane;
+import javax.swing.JPanel;
+import javax.swing.JPasswordField;
+import javax.swing.JTextField;
+import javax.swing.SwingUtilities;
+
+import com.pos.config.Koneksi;
 
 public class Signup extends JFrame {
 
@@ -15,10 +30,10 @@ public class Signup extends JFrame {
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setLayout(null);
 
-        // Background (dark modern)
+        // BACKGROUND
         getContentPane().setBackground(new Color(30, 30, 30));
 
-        // PANEL CARD 
+        // CARD PANEL
         JPanel card = new JPanel();
         card.setLayout(null);
         card.setBounds(75, 60, 350, 300);
@@ -26,14 +41,14 @@ public class Signup extends JFrame {
         card.setBorder(BorderFactory.createLineBorder(new Color(70, 70, 70), 2));
         add(card);
 
-        // Title
+        // TITLE
         JLabel title = new JLabel("LOGIN");
         title.setBounds(120, 10, 150, 40);
         title.setForeground(Color.WHITE);
         title.setFont(new Font("Segoe UI", Font.BOLD, 28));
         card.add(title);
 
-        // Username
+        // USERNAME
         JLabel userLabel = new JLabel("Username");
         userLabel.setBounds(30, 70, 100, 20);
         userLabel.setForeground(Color.LIGHT_GRAY);
@@ -46,7 +61,7 @@ public class Signup extends JFrame {
         usernameField.setBorder(BorderFactory.createEmptyBorder(5, 10, 5, 10));
         card.add(usernameField);
 
-        // Password
+        // PASSWORD
         JLabel passLabel = new JLabel("Password");
         passLabel.setBounds(30, 140, 100, 20);
         passLabel.setForeground(Color.LIGHT_GRAY);
@@ -59,7 +74,7 @@ public class Signup extends JFrame {
         passwordField.setBorder(BorderFactory.createEmptyBorder(5, 10, 5, 10));
         card.add(passwordField);
 
-        // Button Login
+        // BUTTON LOGIN
         JButton loginBtn = new JButton("Login");
         loginBtn.setBounds(30, 240, 280, 35);
         loginBtn.setBackground(new Color(100, 100, 100));
@@ -69,40 +84,58 @@ public class Signup extends JFrame {
         loginBtn.setBorder(BorderFactory.createEmptyBorder());
         card.add(loginBtn);
 
-        JButton daftar = new JButton("Buat Akun");
-        daftar.setBounds(30, 200, 280, 35); 
-        daftar.setBackground(new Color(100, 100, 100)); 
-        daftar.setForeground(Color.WHITE);
-        daftar.setFocusPainted(false);
-        daftar.setFont(new Font("Segoe UI", Font.BOLD, 14));
-        daftar.setBorder(BorderFactory.createEmptyBorder());
-        card.add(daftar);
-
-        daftar.addActionListener(e -> {
-            new FormDaftar();
-        });
-
-        // Action Login
-        loginBtn.addActionListener(e -> {
-            String user = usernameField.getText();
-            String pass = new String(passwordField.getPassword());
-
-            if (user.equals("admin") && pass.equals("admin123")) {
-                JOptionPane.showMessageDialog(this, "Selamat Datang Admin");
-                new Admin();
-            } else if (user.equals("kasir") && pass.equals("kasir123")) {
-                JOptionPane.showMessageDialog(this, "Selamat Datang Kasir");
-            } else {
-                JOptionPane.showMessageDialog(this, "Username / Password salah!");
-            }
-        });
+        // ACTION LOGIN DATABASE
+        loginBtn.addActionListener(e -> login());
 
         setVisible(true);
     }
 
+    void login() {
+
+        String user = usernameField.getText().trim();
+        String pass = new String(passwordField.getPassword()).trim();
+
+        if (user.isEmpty() || pass.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Username dan Password wajib diisi!");
+            return;
+        }
+
+        try {
+            Connection conn = Koneksi.getConnection();
+
+            if (conn == null) {
+                JOptionPane.showMessageDialog(this, "Koneksi database gagal!");
+                return;
+            }
+
+            String sql = "SELECT * FROM admin WHERE username=? AND password=?";
+            PreparedStatement pst = conn.prepareStatement(sql);
+            pst.setString(1, user);
+            pst.setString(2, pass);
+
+            ResultSet rs = pst.executeQuery();
+
+            if (rs.next()) {
+
+                JOptionPane.showMessageDialog(this, "Login berhasil");
+
+                new Admin();
+                this.dispose();
+
+            } else {
+                JOptionPane.showMessageDialog(this, "Username / Password salah!");
+            }
+
+            rs.close();
+            pst.close();
+            conn.close();
+
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(this, "Error: " + e.getMessage());
+        }
+    }
+
     public static void main(String[] args) {
-        SwingUtilities.invokeLater(() -> {
-            new Signup();
-        });
+        SwingUtilities.invokeLater(() -> new Signup());
     }
 }

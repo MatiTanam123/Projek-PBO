@@ -1,335 +1,286 @@
 package com.pos.view;
 
+import java.awt.BorderLayout;
+import java.awt.CardLayout;
 import java.awt.Color;
+import java.awt.Dimension;
+import java.awt.FlowLayout;
 import java.awt.Font;
+import java.awt.Insets;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
 
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JTable;
+import javax.swing.JTextField;
+import javax.swing.SwingConstants;
+import javax.swing.UIManager;
+import javax.swing.border.EmptyBorder;
+import javax.swing.table.DefaultTableModel;
 
 public class Admin extends JFrame {
 
-    // JTextField dashboardField;
-    // JTextField kasir_posField;
-    // JTextField manajamen_bukuField;
-    // JTextField laporanField;
+    JPanel sidebar, content;
+    JTable table, tableTransaksi; // Menambahkan tableTransaksi
+    
+    Color primaryColor = new Color(41, 128, 185);
+    Color sidebarColor = new Color(44, 62, 80);
+    Color bgColor = new Color(236, 240, 241);
+    Color accentColor = new Color(46, 204, 113);
+    Color warningColor = new Color(230, 126, 34); // Warna baru untuk transaksi
 
-    JPanel kiri;
-    JPanel tengah;
+    private Connection connectDB() {
+        try {
+            return DriverManager.getConnection("jdbc:mysql://localhost:3306/tokobuku", "root", "");
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    // --- DATA FETCHING ---
+
+    private DefaultTableModel getBukuData() {
+        DefaultTableModel model = new DefaultTableModel(new String[]{"ISBN", "Judul", "Harga", "Kategori", "Stok"}, 0);
+        try (Connection c = connectDB()) {
+            ResultSet r = c.createStatement().executeQuery("SELECT * FROM buku");
+            while (r.next()) {
+                model.addRow(new Object[]{
+                    r.getString("isbn"), r.getString("judul"),
+                    "Rp " + String.format("%,d", r.getInt("harga")),
+                    r.getString("kategori"), r.getInt("stok")
+                });
+            }
+        } catch (Exception e) { e.printStackTrace(); }
+        return model;
+    }
+
+    private DefaultTableModel getTransaksiData() {
+        // Sesuai kolom: id_transaksi, tanggal, total_harga, metode_bayar, nominal_bayar, id_kasir
+        DefaultTableModel model = new DefaultTableModel(new String[]{
+            "ID Transaksi", "Tanggal", "Total Harga", "Metode", "Nominal Bayar", "ID Kasir"
+        }, 0);
+        try (Connection c = connectDB()) {
+            ResultSet r = c.createStatement().executeQuery("SELECT * FROM transaksi ORDER BY tanggal DESC");
+            while (r.next()) {
+                model.addRow(new Object[]{
+                    r.getString("id_transaksi"),
+                    r.getTimestamp("tanggal"),
+                    "Rp " + String.format("%,d", r.getInt("total_harga")),
+                    r.getString("metode_bayar"),
+                    "Rp " + String.format("%,d", r.getInt("nominal_bayar")),
+                    r.getString("id_kasir")
+                });
+            }
+        } catch (Exception e) { e.printStackTrace(); }
+        return model;
+    }
+
+    private void tambahStok(String isbn, int jml) {
+        try (Connection c = connectDB()) {
+            c.createStatement().executeUpdate("UPDATE buku SET stok=stok+" + jml + " WHERE isbn='" + isbn + "'");
+        } catch (Exception e) { e.printStackTrace(); }
+    }
+
+    // --- GUI SETUP ---
 
     public Admin() {
-        setTitle("Halaman Admin");
-        setSize(600, 400);
+        setTitle("CHAQRIZEMY - Admin Panel");
+        setSize(1100, 700);
         setLocationRelativeTo(null);
         setDefaultCloseOperation(EXIT_ON_CLOSE);
-        setLayout(null);
+        setLayout(new BorderLayout());
 
-        // PANEL KIRI
-        kiri = new JPanel();
-        kiri.setLayout(null);
-        kiri.setBounds(0, 0, 200, 400);
-        kiri.setBackground(new Color(50, 50, 50));
-        kiri.setBorder(BorderFactory.createLineBorder(Color.WHITE));
-        add(kiri);
+        // SIDEBAR
+        sidebar = new JPanel();
+        sidebar.setPreferredSize(new Dimension(230, 700));
+        sidebar.setBackground(sidebarColor);
+        sidebar.setLayout(new FlowLayout(FlowLayout.CENTER, 0, 15));
 
-        // PANEL TENGAH
-        tengah = new JPanel();
-        tengah.setLayout(null);
-        tengah.setBounds(200, 0, 400, 400);
-        tengah.setBackground(new Color(30, 30, 30));
-        add(tengah);
+        JLabel logo = new JLabel("CHAQRIZEMY");
+        logo.setFont(new Font("Segoe UI", Font.BOLD, 22));
+        logo.setForeground(Color.WHITE);
+        logo.setBorder(new EmptyBorder(20, 0, 30, 0));
+        sidebar.add(logo);
 
+        JButton dashBtn = createSidebarBtn("Dashboard");
+        JButton bukuBtn = createSidebarBtn("Manajemen Buku");
+        JButton transBtn = createSidebarBtn("Riwayat Transaksi"); // Tombol baru
 
-        // buat button 
+        sidebar.add(dashBtn);
+        sidebar.add(bukuBtn);
+        sidebar.add(transBtn);
 
-        JButton dashboard = new JButton("Dashboard");
-        dashboard.setBounds(25, 50, 150, 40);
-        dashboard.setBackground(new Color(192, 57, 43));
-        dashboard.setForeground(Color.WHITE);
-        dashboard.setBorder(BorderFactory.createEmptyBorder());
-        kiri.add(dashboard); 
+        // CONTENT
+        content = new JPanel(new CardLayout());
+        content.add(createDashboard(), "dash");
+        content.add(createBukuPanel(), "buku");
+        content.add(createTransaksiPanel(), "trans"); // Panel baru
 
-        // tombol kasir
-        JButton kasir = new JButton("Kasir");
-        kasir.setBounds(25, 110, 150, 40);
-        kasir.setBackground(new Color(192, 57, 43));
-        kasir.setForeground(Color.WHITE);
-        kasir.setFocusPainted(false);
-        kasir.setBorder(BorderFactory.createEmptyBorder());
-        kiri.add(kasir); 
+        dashBtn.addActionListener(e -> switchPanel("dash"));
+        bukuBtn.addActionListener(e -> {
+            table.setModel(getBukuData());
+            switchPanel("buku");
+        });
+        transBtn.addActionListener(e -> {
+            tableTransaksi.setModel(getTransaksiData());
+            switchPanel("trans");
+        });
 
-
-
-        // tombol manajemen buku
-        JButton manajemenBuku = new JButton("Manajemen Buku");
-        manajemenBuku.setBounds(25, 170, 150, 40);
-        manajemenBuku.setBackground(new Color(192, 57, 43));
-        manajemenBuku.setForeground(Color.WHITE);
-        manajemenBuku.setFocusPainted(false);
-        manajemenBuku.setBorder(BorderFactory.createEmptyBorder());
-        kiri.add(manajemenBuku);
-
-        // tombol transaksi
-        JButton transaksi = new JButton("Transaksi");
-        transaksi.setBounds(25, 230, 150, 40);
-        transaksi.setBackground(new Color(192, 57, 43));
-        transaksi.setForeground(Color.WHITE);
-        transaksi.setFocusPainted(false);
-        transaksi.setBorder(BorderFactory.createEmptyBorder());
-        kiri.add(transaksi);
-
-
-        // tombol logut
-        JButton logout = new JButton("logout");
-        logout.setBounds(25, 290, 150, 40);
-        logout.setBackground(new Color(192, 57, 43));
-        logout.setForeground(Color.WHITE);
-        logout.setFocusPainted(false);
-        logout.setBorder(BorderFactory.createEmptyBorder());
-        kiri.add(logout);
-
-
+        add(sidebar, BorderLayout.WEST);
+        add(content, BorderLayout.CENTER);
         setVisible(true);
+    }
 
+    private JButton createSidebarBtn(String text) {
+        JButton b = new JButton(text);
+        b.setPreferredSize(new Dimension(200, 45));
+        b.setFocusPainted(false);
+        b.setBorderPainted(false);
+        b.setBackground(sidebarColor);
+        b.setForeground(new Color(189, 195, 199));
+        b.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        b.setHorizontalAlignment(SwingConstants.LEFT);
+        b.setMargin(new Insets(0, 20, 0, 0));
+        b.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseEntered(java.awt.event.MouseEvent evt) { b.setBackground(new Color(52, 73, 94)); b.setForeground(Color.WHITE); }
+            public void mouseExited(java.awt.event.MouseEvent evt) { b.setBackground(sidebarColor); b.setForeground(new Color(189, 195, 199)); }
+        });
+        return b;
+    }
 
-        // aksi logout
-        logout.addActionListener(e -> {
-            new Signup();
-            this.dispose();
-          
+    private void switchPanel(String name) {
+        CardLayout cl = (CardLayout) content.getLayout();
+        cl.show(content, name);
+    }
+
+    // --- PANELS ---
+
+    private JPanel createDashboard() {
+        JPanel p = new JPanel(new BorderLayout());
+        p.setBackground(bgColor);
+        p.setBorder(new EmptyBorder(30, 30, 30, 30));
+
+        JLabel title = new JLabel("Ringkasan Sistem");
+        title.setFont(new Font("Segoe UI", Font.BOLD, 26));
+        p.add(title, BorderLayout.NORTH);
+
+        JPanel cardContainer = new JPanel(new FlowLayout(FlowLayout.LEFT, 20, 20));
+        cardContainer.setBackground(bgColor);
+
+        cardContainer.add(createCard("Total Judul Buku", String.valueOf(getCount("COUNT(*)", "buku")), primaryColor));
+        cardContainer.add(createCard("Total Transaksi", String.valueOf(getCount("COUNT(*)", "transaksi")), warningColor));
+        cardContainer.add(createCard("Total Pendapatan", "Rp " + String.format("%,d", getCount("SUM(total_harga)", "transaksi")), accentColor));
+
+        p.add(cardContainer, BorderLayout.CENTER);
+        return p;
+    }
+
+    private JPanel createBukuPanel() {
+        JPanel p = new JPanel(new BorderLayout(0, 20));
+        p.setBackground(bgColor);
+        p.setBorder(new EmptyBorder(30, 30, 30, 30));
+
+        p.add(new JLabel("<html><span style='font-size:18px; font-weight:bold;'>Manajemen Inventaris</span></html>"), BorderLayout.NORTH);
+
+        table = new JTable(getBukuData());
+        styleTable(table);
+        p.add(new JScrollPane(table), BorderLayout.CENTER);
+
+        JPanel controls = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
+        controls.setBackground(bgColor);
+        JTextField input = new JTextField();
+        input.setPreferredSize(new Dimension(100, 35));
+        JButton btn = new JButton("Update Stok");
+        btn.setPreferredSize(new Dimension(120, 35));
+        btn.setBackground(primaryColor);
+        btn.setForeground(Color.WHITE);
+
+        btn.addActionListener(e -> {
+            int row = table.getSelectedRow();
+            if (row == -1) return;
+            String isbn = table.getValueAt(row, 0).toString();
+            tambahStok(isbn, Integer.parseInt(input.getText()));
+            table.setModel(getBukuData());
         });
 
-        dashboard.addActionListener(e -> {
-    tengah.removeAll();
-    tengah.setBackground(new Color(245, 247, 250));
+        controls.add(new JLabel("Tambah Unit:"));
+        controls.add(input);
+        controls.add(btn);
+        p.add(controls, BorderLayout.SOUTH);
+        return p;
+    }
 
-    // ================= TITLE =================
-    JLabel title = new JLabel("Dashboard");
-    title.setFont(new Font("SansSerif", Font.BOLD, 26));
-    title.setBounds(30, 20, 300, 40);
+    private JPanel createTransaksiPanel() {
+        JPanel p = new JPanel(new BorderLayout(0, 20));
+        p.setBackground(bgColor);
+        p.setBorder(new EmptyBorder(30, 30, 30, 30));
 
-    JLabel subtitle = new JLabel("Selamat datang di sistem Point of Sale Toko Buku");
-    subtitle.setFont(new Font("SansSerif", Font.PLAIN, 13));
-    subtitle.setForeground(new Color(120, 120, 120));
-    subtitle.setBounds(30, 60, 500, 20);
+        // Header Panel
+        JPanel headerPanel = new JPanel(new BorderLayout());
+        headerPanel.setBackground(bgColor);
+        
+        JLabel title = new JLabel("Laporan Riwayat Transaksi");
+        title.setFont(new Font("Segoe UI", Font.BOLD, 24));
+        headerPanel.add(title, BorderLayout.WEST);
 
-    // ================= CARD 1 =================
-    JPanel cardStok = new JPanel();
-    cardStok.setLayout(null);
-    cardStok.setBackground(Color.WHITE);
-    cardStok.setBounds(30, 110, 180, 110);
-    cardStok.setBorder(BorderFactory.createLineBorder(new Color(230, 230, 230)));
+        JButton refreshBtn = new JButton("Refresh Data");
+        refreshBtn.addActionListener(e -> tableTransaksi.setModel(getTransaksiData()));
+        headerPanel.add(refreshBtn, BorderLayout.EAST);
 
-    JPanel top1 = new JPanel();
-    top1.setBackground(new Color(52, 152, 219));
-    top1.setBounds(0, 0, 180, 6);
+        p.add(headerPanel, BorderLayout.NORTH);
 
-    JLabel t1 = new JLabel("Total Buku");
-    t1.setFont(new Font("SansSerif", Font.PLAIN, 12));
-    t1.setForeground(Color.GRAY);
-    t1.setBounds(10, 20, 160, 20);
+        // Table
+        tableTransaksi = new JTable(getTransaksiData());
+        styleTable(tableTransaksi);
+        JScrollPane sp = new JScrollPane(tableTransaksi);
+        p.add(sp, BorderLayout.CENTER);
 
-    JLabel v1 = new JLabel("1,250");
-    v1.setFont(new Font("SansSerif", Font.BOLD, 26));
-    v1.setForeground(new Color(52, 152, 219));
-    v1.setBounds(10, 50, 160, 40);
+        return p;
+    }
 
-    cardStok.add(top1);
-    cardStok.add(t1);
-    cardStok.add(v1);
+    // --- HELPERS ---
 
-    // ================= CARD 2 =================
-    JPanel cardKasir = new JPanel();
-    cardKasir.setLayout(null);
-    cardKasir.setBackground(Color.WHITE);
-    cardKasir.setBounds(230, 110, 180, 110);
-    cardKasir.setBorder(BorderFactory.createLineBorder(new Color(230, 230, 230)));
+    private void styleTable(JTable t) {
+        t.setRowHeight(35);
+        t.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        t.setSelectionBackground(new Color(232, 244, 253));
+        t.setGridColor(new Color(230, 230, 230));
+        t.getTableHeader().setFont(new Font("Segoe UI", Font.BOLD, 13));
+        t.getTableHeader().setBackground(Color.WHITE);
+    }
 
-    JPanel top2 = new JPanel();
-    top2.setBackground(new Color(46, 204, 113));
-    top2.setBounds(0, 0, 180, 6);
+    private int getCount(String queryPart, String tableName) {
+        try (Connection c = connectDB()) {
+            ResultSet r = c.createStatement().executeQuery("SELECT " + queryPart + " AS res FROM " + tableName);
+            if (r.next()) return r.getInt("res");
+        } catch (Exception e) { }
+        return 0;
+    }
 
-    JLabel t2 = new JLabel("Kasir Aktif");
-    t2.setFont(new Font("SansSerif", Font.PLAIN, 12));
-    t2.setForeground(Color.GRAY);
-    t2.setBounds(10, 20, 160, 20);
-
-    JLabel v2 = new JLabel("3");
-    v2.setFont(new Font("SansSerif", Font.BOLD, 26));
-    v2.setForeground(new Color(46, 204, 113));
-    v2.setBounds(10, 50, 160, 40);
-
-    cardKasir.add(top2);
-    cardKasir.add(t2);
-    cardKasir.add(v2);
-
-    // ================= CARD 3 =================
-    JPanel cardTransaksi = new JPanel();
-    cardTransaksi.setLayout(null);
-    cardTransaksi.setBackground(Color.WHITE);
-    cardTransaksi.setBounds(430, 110, 180, 110);
-    cardTransaksi.setBorder(BorderFactory.createLineBorder(new Color(230, 230, 230)));
-
-    JPanel top3 = new JPanel();
-    top3.setBackground(new Color(155, 89, 182));
-    top3.setBounds(0, 0, 180, 6);
-
-    JLabel t3 = new JLabel("Transaksi");
-    t3.setFont(new Font("SansSerif", Font.PLAIN, 12));
-    t3.setForeground(Color.GRAY);
-    t3.setBounds(10, 20, 160, 20);
-
-    JLabel v3 = new JLabel("320");
-    v3.setFont(new Font("SansSerif", Font.BOLD, 26));
-    v3.setForeground(new Color(155, 89, 182));
-    v3.setBounds(10, 50, 160, 40);
-
-    cardTransaksi.add(top3);
-    cardTransaksi.add(t3);
-    cardTransaksi.add(v3);
-
-    // ================= CARD 4 =================
-    JPanel cardHabis = new JPanel();
-    cardHabis.setLayout(null);
-    cardHabis.setBackground(Color.WHITE);
-    cardHabis.setBounds(30, 240, 180, 110);
-    cardHabis.setBorder(BorderFactory.createLineBorder(new Color(230, 230, 230)));
-
-    JPanel top4 = new JPanel();
-    top4.setBackground(new Color(231, 76, 60));
-    top4.setBounds(0, 0, 180, 6);
-
-    JLabel t4 = new JLabel("Stok Habis");
-    t4.setFont(new Font("SansSerif", Font.PLAIN, 12));
-    t4.setForeground(Color.GRAY);
-    t4.setBounds(10, 20, 160, 20);
-
-    JLabel v4 = new JLabel("12");
-    v4.setFont(new Font("SansSerif", Font.BOLD, 26));
-    v4.setForeground(new Color(231, 76, 60));
-    v4.setBounds(10, 50, 160, 40);
-
-    cardHabis.add(top4);
-    cardHabis.add(t4);
-    cardHabis.add(v4);
-
-
-    JPanel cardPenjualan = new JPanel();
-cardPenjualan.setLayout(null);
-cardPenjualan.setBackground(Color.WHITE);
-cardPenjualan.setBounds(230, 240, 180, 110);
-cardPenjualan.setBorder(BorderFactory.createLineBorder(new Color(230, 230, 230)));
-
-JPanel top5 = new JPanel();
-top5.setBackground(new Color(241, 196, 15)); // kuning emas
-top5.setBounds(0, 0, 180, 6);
-
-JLabel t5 = new JLabel("Total Penjualan");
-t5.setFont(new Font("SansSerif", Font.PLAIN, 12));
-t5.setForeground(Color.GRAY);
-t5.setBounds(10, 20, 160, 20);
-
-JLabel v5 = new JLabel("Rp 12.500.000");
-v5.setFont(new Font("SansSerif", Font.BOLD, 22));
-v5.setForeground(new Color(241, 196, 15));
-v5.setBounds(10, 50, 170, 40);
-
-cardPenjualan.add(top5);
-cardPenjualan.add(t5);
-cardPenjualan.add(v5);
-
-    // ================= ADD ALL =================
-    tengah.add(title);
-    tengah.add(subtitle);
-    tengah.add(cardStok);
-    tengah.add(cardKasir);
-    tengah.add(cardTransaksi);
-    tengah.add(cardHabis);
-    tengah.add(cardPenjualan);
-    tengah.revalidate();
-    tengah.repaint();
-});
-
-
-        kasir.addActionListener(e ->{
-            tengah.removeAll(); 
-            
-            JLabel title = new JLabel("Kasir");
-            title.setFont(new Font("SansSerif", Font.BOLD, 24));
-            title.setBounds(30, 20, 300, 40);
-            
-            JLabel subtitle = new JLabel("Pilih buku untuk ditambahkan ke keranjang");
-            subtitle.setForeground(Color.ORANGE);
-            subtitle.setBounds(30, 55, 400, 20);
-             
-
-
-            tengah.add(title);
-            tengah.add(subtitle);
-            
-
-            // PENTING: Refresh tampilan
-            tengah.revalidate();
-            tengah.repaint();
-
-        });
-
-        manajemenBuku.addActionListener(e ->{
-            tengah.removeAll(); 
-            
-            JLabel title = new JLabel("Manajemen Bukuu");
-            title.setFont(new Font("SansSerif", Font.BOLD, 24));
-            title.setBounds(30, 20, 300, 40);
-            
-            JLabel subtitle = new JLabel("Kelola data buku dalam inventori");
-            subtitle.setForeground(Color.ORANGE);
-            subtitle.setBounds(30, 55, 400, 20);
-             
-
-
-            tengah.add(title);
-            tengah.add(subtitle);
-            
-
-            // PENTING: Refresh tampilan
-            tengah.revalidate();
-            tengah.repaint();
-
-        }
-        );
-
-
-         transaksi.addActionListener(e ->{
-            tengah.removeAll(); 
-            
-            JLabel title = new JLabel("Transaksi");
-            title.setFont(new Font("SansSerif", Font.BOLD, 24));
-            title.setBounds(30, 20, 300, 40);
-            
-            JLabel subtitle = new JLabel("Kelola Transaksi");
-            subtitle.setForeground(Color.ORANGE);
-            subtitle.setBounds(30, 55, 400, 20);
-             
-
-
-            tengah.add(title);
-            tengah.add(subtitle);
-            
-
-            // PENTING: Refresh tampilan
-            tengah.revalidate();
-            tengah.repaint();
-
-        }
-        );
-
-
-       
+    private JPanel createCard(String title, String value, Color accent) {
+        JPanel card = new JPanel(new BorderLayout());
+        card.setPreferredSize(new Dimension(280, 120));
+        card.setBackground(Color.WHITE);
+        card.setBorder(BorderFactory.createMatteBorder(0, 5, 0, 0, accent));
+        JLabel t = new JLabel(title);
+        t.setBorder(new EmptyBorder(15, 20, 0, 0));
+        JLabel v = new JLabel(value);
+        v.setBorder(new EmptyBorder(0, 20, 15, 0));
+        v.setFont(new Font("Segoe UI", Font.BOLD, 22));
+        card.add(t, BorderLayout.NORTH);
+        card.add(v, BorderLayout.CENTER);
+        return card;
     }
 
     public static void main(String[] args) {
+        try { UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName()); } catch (Exception e) {}
         new Admin();
     }
 }
