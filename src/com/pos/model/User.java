@@ -11,6 +11,10 @@ public abstract class User {
         this.password = password;
     }
 
+    public void tampilkanRole() {
+        System.out.println("Role: User Umum");
+    }
+    
     // Getter & Setter
     public String getUsername() { return username; }
 }
