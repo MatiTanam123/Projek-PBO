@@ -91,49 +91,63 @@ public class Signup extends JFrame {
     }
 
     void login() {
+    String user = usernameField.getText().trim();
+    String pass = new String(passwordField.getPassword()).trim();
 
-        String user = usernameField.getText().trim();
-        String pass = new String(passwordField.getPassword()).trim();
+    if (user.isEmpty() || pass.isEmpty()) {
+        JOptionPane.showMessageDialog(this, "Username dan Password wajib diisi!");
+        return;
+    }
 
-        if (user.isEmpty() || pass.isEmpty()) {
-            JOptionPane.showMessageDialog(this, "Username dan Password wajib diisi!");
+    try (Connection conn = Koneksi.getConnection()) {
+        if (conn == null) {
+            JOptionPane.showMessageDialog(this, "Koneksi database gagal!");
             return;
         }
 
-        try {
-            Connection conn = Koneksi.getConnection();
+        // Cek tabel admin
+        String sqlAdmin = "SELECT id_admin FROM admin WHERE username=? AND password=?";
+        PreparedStatement pstAdmin = conn.prepareStatement(sqlAdmin);
+        pstAdmin.setString(1, user);
+        pstAdmin.setString(2, pass);
+        ResultSet rsAdmin = pstAdmin.executeQuery();
 
-            if (conn == null) {
-                JOptionPane.showMessageDialog(this, "Koneksi database gagal!");
-                return;
-            }
-
-            String sql = "SELECT * FROM admin WHERE username=? AND password=?";
-            PreparedStatement pst = conn.prepareStatement(sql);
-            pst.setString(1, user);
-            pst.setString(2, pass);
-
-            ResultSet rs = pst.executeQuery();
-
-            if (rs.next()) {
-
-                JOptionPane.showMessageDialog(this, "Login berhasil");
-
-                new Admin();
-                this.dispose();
-
-            } else {
-                JOptionPane.showMessageDialog(this, "Username / Password salah!");
-            }
-
-            rs.close();
-            pst.close();
-            conn.close();
-
-        } catch (Exception e) {
-            JOptionPane.showMessageDialog(this, "Error: " + e.getMessage());
+        if (rsAdmin.next()) {
+            // Admin berhasil login
+            JOptionPane.showMessageDialog(this, "Login sebagai Admin");
+            new Admin();
+            dispose();
+            return;
         }
+        rsAdmin.close();
+        pstAdmin.close();
+
+        // Cek tabel kasir
+        String sqlKasir = "SELECT id_kasir, username FROM kasir WHERE username=? AND password=?";
+        PreparedStatement pstKasir = conn.prepareStatement(sqlKasir);
+        pstKasir.setString(1, user);
+        pstKasir.setString(2, pass);
+        ResultSet rsKasir = pstKasir.executeQuery();
+
+        if (rsKasir.next()) {
+            String idKasir = rsKasir.getString("id_kasir");
+            String usernameKasir = rsKasir.getString("username");
+            JOptionPane.showMessageDialog(this, "Login sebagai Kasir: " + usernameKasir);
+            new Kasir(idKasir, usernameKasir);
+            dispose();
+            return;
+        }
+        rsKasir.close();
+        pstKasir.close();
+
+        // Jika tidak ada yang cocok
+        JOptionPane.showMessageDialog(this, "Username / Password salah!");
+
+    } catch (Exception e) {
+        JOptionPane.showMessageDialog(this, "Error: " + e.getMessage());
+        e.printStackTrace();
     }
+}
 
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> new Signup());
