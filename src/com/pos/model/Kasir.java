@@ -7,10 +7,6 @@ public class Kasir extends User {
         super(idUser, username, password);
     }
 
-    /**
-     * Metode ini opsional, tapi berguna jika nanti Jere ingin menampilkan 
-     * nama kasir di Struk atau Header Dashboard dengan format tertentu.
-     */
     @Override
     public String getUsername() {
         return super.getUsername().toUpperCase(); // Contoh: Nama kasir selalu huruf kapital
