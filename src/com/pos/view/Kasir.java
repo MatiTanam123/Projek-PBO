@@ -5,9 +5,20 @@ import com.pos.config.Koneksi;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import javax.swing.table.DefaultTableModel;
+
+// Import iText classes (hanya yang dibutuhkan, JANGAN import Font)
+import com.itextpdf.text.Document;
+import com.itextpdf.text.PageSize;
+import com.itextpdf.text.Paragraph;
+import com.itextpdf.text.pdf.PdfWriter;
+
 import java.awt.*;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.sql.*;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 
 public class Kasir extends JFrame {
@@ -17,10 +28,8 @@ public class Kasir extends JFrame {
     private JTable tableKeranjang;
     private DefaultTableModel modelKeranjang;
     private JLabel lblTotal;
-    private String idKasir; // ID kasir yang login (misal 'KSR001')
+    private String idKasir;
     private String usernameKasir;
-
-    // Struktur data untuk keranjang: simpan isbn, judul, harga, qty, subtotal
     private List<KeranjangItem> keranjang = new ArrayList<>();
 
     public Kasir(String idKasir, String usernameKasir) {
@@ -37,16 +46,14 @@ public class Kasir extends JFrame {
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setLayout(new BorderLayout(10, 10));
 
-        // Panel Utama
         JPanel main = new JPanel(new GridLayout(1, 2, 10, 10));
         main.setBorder(new EmptyBorder(10, 10, 10, 10));
         main.setBackground(new Color(236, 240, 241));
 
-        // ===== PANEL KIRI : Pencarian & Keranjang =====
+        // ===== PANEL KIRI =====
         JPanel panelKiri = new JPanel(new BorderLayout(5, 5));
         panelKiri.setBackground(Color.WHITE);
 
-        // Form pencarian
         JPanel panelCari = new JPanel(new FlowLayout(FlowLayout.LEFT));
         panelCari.add(new JLabel("Cari Buku (ISBN / Judul):"));
         txtCari = new JTextField(20);
@@ -54,7 +61,6 @@ public class Kasir extends JFrame {
         JButton btnCari = new JButton("Cari");
         panelCari.add(btnCari);
 
-        // Tabel hasil pencarian
         String[] kolomHasil = {"ISBN", "Judul", "Harga", "Stok"};
         DefaultTableModel modelHasil = new DefaultTableModel(kolomHasil, 0);
         JTable tableHasil = new JTable(modelHasil);
@@ -62,7 +68,6 @@ public class Kasir extends JFrame {
         JScrollPane scrollHasil = new JScrollPane(tableHasil);
         scrollHasil.setPreferredSize(new Dimension(0, 200));
 
-        // Input qty dan tombol tambah
         JPanel panelAdd = new JPanel(new FlowLayout(FlowLayout.LEFT));
         panelAdd.add(new JLabel("Jumlah:"));
         txtQty = new JTextField(5);
@@ -75,14 +80,12 @@ public class Kasir extends JFrame {
         panelAtas.add(scrollHasil, BorderLayout.CENTER);
         panelAtas.add(panelAdd, BorderLayout.SOUTH);
 
-        // Tabel keranjang belanja
         String[] kolomKeranjang = {"ISBN", "Judul", "Harga", "Qty", "Subtotal"};
         modelKeranjang = new DefaultTableModel(kolomKeranjang, 0);
         tableKeranjang = new JTable(modelKeranjang);
         tableKeranjang.setRowHeight(30);
         JScrollPane scrollKeranjang = new JScrollPane(tableKeranjang);
         
-        // Panel untuk tombol edit/hapus keranjang
         JPanel panelActionKeranjang = new JPanel(new FlowLayout(FlowLayout.LEFT));
         JButton btnEdit = new JButton("Edit Jumlah");
         JButton btnHapus = new JButton("Hapus Item");
@@ -97,7 +100,7 @@ public class Kasir extends JFrame {
         panelKiri.add(panelAtas, BorderLayout.NORTH);
         panelKiri.add(panelKeranjang, BorderLayout.CENTER);
 
-        // ===== PANEL KANAN : Pembayaran =====
+        // ===== PANEL KANAN =====
         JPanel panelKanank = new JPanel(new BorderLayout(5, 5));
         panelKanank.setBackground(Color.WHITE);
         panelKanank.setBorder(new EmptyBorder(20, 20, 20, 20));
@@ -157,9 +160,7 @@ public class Kasir extends JFrame {
         setVisible(true);
     }
 
-    private void loadDataAwal() {
-        // Bisa kosong, atau memuat daftar buku terbaru (opsional)
-    }
+    private void loadDataAwal() {}
 
     private void cariBuku(DefaultTableModel model, String keyword) {
         model.setRowCount(0);
@@ -192,7 +193,6 @@ public class Kasir extends JFrame {
         String isbn = (String) tableHasil.getValueAt(selected, 0);
         String judul = (String) tableHasil.getValueAt(selected, 1);
         String hargaStr = (String) tableHasil.getValueAt(selected, 2);
-        // Hapus "Rp ", lalu hapus semua titik (pemisah ribuan) dan koma (jika ada)
         double harga = Double.parseDouble(hargaStr.replace("Rp ", "").replace(".", "").replace(",", ""));
         int stokTersedia = (int) tableHasil.getValueAt(selected, 3);
         int qty;
@@ -207,10 +207,8 @@ public class Kasir extends JFrame {
             JOptionPane.showMessageDialog(this, "Stok tidak mencukupi! Tersedia: " + stokTersedia);
             return;
         }
-        // Cek apakah buku sudah ada di keranjang?
         for (KeranjangItem item : keranjang) {
             if (item.isbn.equals(isbn)) {
-                // Update jumlah
                 item.qty += qty;
                 if (item.qty > stokTersedia) {
                     item.qty -= qty;
@@ -223,7 +221,6 @@ public class Kasir extends JFrame {
                 return;
             }
         }
-        // Tambah baru
         double subtotal = harga * qty;
         keranjang.add(new KeranjangItem(isbn, judul, harga, qty, subtotal));
         refreshTableKeranjang();
@@ -260,7 +257,6 @@ public class Kasir extends JFrame {
             JOptionPane.showMessageDialog(this, "Jumlah tidak valid!");
             return;
         }
-        // Validasi stok dari database
         int stokSekarang = TransaksiService.getStokBuku(item.isbn);
         if (newQty > stokSekarang + item.qty) {
             JOptionPane.showMessageDialog(this, "Stok tidak mencukupi! Stok saat ini: " + stokSekarang);
@@ -339,7 +335,6 @@ public class Kasir extends JFrame {
             return;
         }
         String metode = (String) cbMetodeBayar.getSelectedItem();
-        // Siapkan items array
         String[][] items = new String[keranjang.size()][3];
         for (int i = 0; i < keranjang.size(); i++) {
             KeranjangItem item = keranjang.get(i);
@@ -350,9 +345,7 @@ public class Kasir extends JFrame {
         boolean sukses = TransaksiService.simpanTransaksi(idKasir, total, bayar, metode, items);
         if (sukses) {
             JOptionPane.showMessageDialog(this, "Transaksi berhasil disimpan!\nKembalian: " + lblKembalian.getText());
-            // cetak struk sederhana ke console
-            cetakStruk(total, bayar, metode);
-            // reset keranjang dan form
+            cetakStrukPDF(total, bayar, metode);
             keranjang.clear();
             refreshTableKeranjang();
             hitungTotal();
@@ -363,26 +356,60 @@ public class Kasir extends JFrame {
         }
     }
 
-    private void cetakStruk(double total, double bayar, String metode) {
-        System.out.println("========== STRUK PEMBAYARAN ==========");
-        System.out.println("CHAQRIZEMY BOOKSTORE");
-        System.out.println("Kasir: " + usernameKasir);
-        System.out.println("Tanggal: " + new java.util.Date());
-        System.out.println("--------------------------------------");
-        System.out.printf("%-15s %-5s %-12s\n", "Buku", "Qty", "Subtotal");
-        for (KeranjangItem item : keranjang) {
-            System.out.printf("%-15s %-5d Rp %,-12.0f\n", item.judul.length()>15?item.judul.substring(0,12)+"...":item.judul, item.qty, item.subtotal);
+    private void cetakStrukPDF(double total, double bayar, String metode) {
+        try {
+            File folder = new File("struk");
+            if (!folder.exists()) folder.mkdir();
+            String timestamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
+            String namaFile = "struk/Struk_" + timestamp + ".pdf";
+            Document document = new Document(PageSize.A6);
+            PdfWriter.getInstance(document, new FileOutputStream(namaFile));
+            document.open();
+
+            // Gunakan nama lengkap untuk iText Font (karena tidak diimport)
+            com.itextpdf.text.Font titleFont = new com.itextpdf.text.Font(com.itextpdf.text.Font.FontFamily.HELVETICA, 14, com.itextpdf.text.Font.BOLD);
+            com.itextpdf.text.Font normalFont = new com.itextpdf.text.Font(com.itextpdf.text.Font.FontFamily.HELVETICA, 10, com.itextpdf.text.Font.NORMAL);
+            com.itextpdf.text.Font boldFont = new com.itextpdf.text.Font(com.itextpdf.text.Font.FontFamily.HELVETICA, 10, com.itextpdf.text.Font.BOLD);
+            com.itextpdf.text.Font smallFont = new com.itextpdf.text.Font(com.itextpdf.text.Font.FontFamily.HELVETICA, 8, com.itextpdf.text.Font.NORMAL);
+
+            document.add(new Paragraph("CHAQRIZEMY BOOKSTORE", titleFont));
+            document.add(new Paragraph("Jl. Contoh No. 123, Pontianak", smallFont));
+            document.add(new Paragraph("Telp: 0812-3456-7890", smallFont));
+            document.add(new Paragraph(" "));
+            document.add(new Paragraph("Kasir: " + usernameKasir, normalFont));
+            document.add(new Paragraph("Tanggal: " + new SimpleDateFormat("dd/MM/yyyy HH:mm:ss").format(new Date()), normalFont));
+            document.add(new Paragraph("----------------------------------------", normalFont));
+            document.add(new Paragraph(String.format("%-12s %4s %8s", "Nama Buku", "Qty", "Subtotal"), boldFont));
+            document.add(new Paragraph("----------------------------------------", normalFont));
+
+            for (KeranjangItem item : keranjang) {
+                String judul = item.judul;
+                if (judul.length() > 12) judul = judul.substring(0, 10) + "..";
+                document.add(new Paragraph(String.format("%-12s %4d Rp %8s",
+                    judul, item.qty, formatRupiah((long)item.subtotal)), normalFont));
+            }
+
+            document.add(new Paragraph("----------------------------------------", normalFont));
+            document.add(new Paragraph(String.format("%-18s Rp %10s", "Total:", formatRupiah((long)total)), boldFont));
+            document.add(new Paragraph(String.format("%-18s Rp %10s", "Bayar:", formatRupiah((long)bayar)), normalFont));
+            document.add(new Paragraph(String.format("%-18s Rp %10s", "Kembali:", formatRupiah((long)(bayar - total))), normalFont));
+            document.add(new Paragraph("Metode: " + metode, normalFont));
+            document.add(new Paragraph(" "));
+            document.add(new Paragraph("Terima kasih telah berbelanja!", boldFont));
+            document.add(new Paragraph("Simpan struk ini sebagai bukti.", smallFont));
+
+            document.close();
+            JOptionPane.showMessageDialog(this, "Struk PDF telah disimpan di folder 'struk'");
+        } catch (Exception e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(this, "Gagal mencetak PDF: " + e.getMessage());
         }
-        System.out.println("--------------------------------------");
-        System.out.printf("Total: Rp %,-.0f\n", total);
-        System.out.printf("Bayar: Rp %,-.0f\n", bayar);
-        System.out.printf("Kembali: Rp %,-.0f\n", bayar - total);
-        System.out.println("Metode: " + metode);
-        System.out.println("Terima kasih telah berbelanja!");
-        System.out.println("======================================");
     }
 
-    // Inner class untuk item keranjang
+    private String formatRupiah(long value) {
+        return String.format("%,d", value).replace(",", ".");
+    }
+
     private static class KeranjangItem {
         String isbn, judul;
         double harga;
