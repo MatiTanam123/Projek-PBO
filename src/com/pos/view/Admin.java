@@ -18,6 +18,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import com.pos.dao.KasirDAO;
 
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
@@ -27,6 +28,7 @@ import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
+import javax.swing.JPasswordField;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.JTextField;
@@ -38,7 +40,7 @@ import javax.swing.table.DefaultTableModel;
 public class Admin extends JFrame {
 
     JPanel sidebar, content;
-    JTable table, tableTransaksi, tableLaporan;
+    JTable table, tableTransaksi, tableLaporan, tableKasir;
     DefaultTableModel modelLaporan;
     BarChartPanel chartPanel;
 
@@ -104,16 +106,16 @@ public class Admin extends JFrame {
         dialog.setSize(450, 350);
         dialog.setLocationRelativeTo(this);
         dialog.setLayout(new BorderLayout());
-        
+
         JPanel formPanel = new JPanel(new GridLayout(5, 2, 10, 10));
         formPanel.setBorder(new EmptyBorder(20, 20, 20, 20));
-        
+
         JTextField tfIsbn = new JTextField();
         JTextField tfJudul = new JTextField();
         JTextField tfHarga = new JTextField();
         JTextField tfKategori = new JTextField();
         JTextField tfStok = new JTextField();
-        
+
         formPanel.add(new JLabel("ISBN:"));
         formPanel.add(tfIsbn);
         formPanel.add(new JLabel("Judul:"));
@@ -124,28 +126,28 @@ public class Admin extends JFrame {
         formPanel.add(tfKategori);
         formPanel.add(new JLabel("Stok Awal:"));
         formPanel.add(tfStok);
-        
+
         JPanel buttonPanel = new JPanel(new FlowLayout());
         JButton btnSimpan = new JButton("Simpan");
         JButton btnBatal = new JButton("Batal");
         buttonPanel.add(btnSimpan);
         buttonPanel.add(btnBatal);
-        
+
         dialog.add(formPanel, BorderLayout.CENTER);
         dialog.add(buttonPanel, BorderLayout.SOUTH);
-        
+
         btnSimpan.addActionListener(e -> {
             String isbn = tfIsbn.getText().trim();
             String judul = tfJudul.getText().trim();
             String hargaStr = tfHarga.getText().trim();
             String kategori = tfKategori.getText().trim();
             String stokStr = tfStok.getText().trim();
-            
+
             if (isbn.isEmpty() || judul.isEmpty() || hargaStr.isEmpty() || kategori.isEmpty() || stokStr.isEmpty()) {
                 JOptionPane.showMessageDialog(dialog, "Semua field harus diisi!");
                 return;
             }
-            
+
             double harga;
             int stok;
             try {
@@ -156,8 +158,7 @@ public class Admin extends JFrame {
                 JOptionPane.showMessageDialog(dialog, "Harga dan Stok harus angka positif!");
                 return;
             }
-            
-            // Cek duplikat ISBN
+
             String cekSql = "SELECT isbn FROM buku WHERE isbn = ?";
             try (Connection conn = connectDB();
                  PreparedStatement ps = conn.prepareStatement(cekSql)) {
@@ -170,8 +171,7 @@ public class Admin extends JFrame {
             } catch (SQLException ex) {
                 ex.printStackTrace();
             }
-            
-            // Insert buku baru
+
             String sql = "INSERT INTO buku (isbn, judul, harga, kategori, stok) VALUES (?, ?, ?, ?, ?)";
             try (Connection conn = connectDB();
                  PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -183,20 +183,19 @@ public class Admin extends JFrame {
                 ps.executeUpdate();
                 JOptionPane.showMessageDialog(dialog, "Buku berhasil ditambahkan!");
                 dialog.dispose();
-                table.setModel(getBukuData()); // refresh tabel
+                table.setModel(getBukuData());
             } catch (SQLException ex) {
                 ex.printStackTrace();
                 JOptionPane.showMessageDialog(dialog, "Gagal menambahkan buku: " + ex.getMessage());
             }
         });
-        
+
         btnBatal.addActionListener(e -> dialog.dispose());
         dialog.setVisible(true);
     }
 
     // ========== FITUR HAPUS BUKU ==========
     private void hapusBuku(String isbn) {
-        // Cek apakah buku sudah pernah terjual (ada di item_belanja)
         String cekSql = "SELECT COUNT(*) FROM item_belanja WHERE isbn = ?";
         try (Connection conn = connectDB();
              PreparedStatement ps = conn.prepareStatement(cekSql)) {
@@ -213,8 +212,7 @@ public class Admin extends JFrame {
         } catch (SQLException e) {
             e.printStackTrace();
         }
-        
-        // Hapus buku
+
         String sql = "DELETE FROM buku WHERE isbn = ?";
         try (Connection conn = connectDB();
              PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -266,11 +264,13 @@ public class Admin extends JFrame {
         JButton bukuBtn = createSidebarBtn("Manajemen Buku");
         JButton transBtn = createSidebarBtn("Riwayat Transaksi");
         JButton laporanBtn = createSidebarBtn("Laporan Penjualan");
+        JButton kasirBtn = createSidebarBtn("Manajemen Kasir");
 
         sidebar.add(dashBtn);
         sidebar.add(bukuBtn);
         sidebar.add(transBtn);
         sidebar.add(laporanBtn);
+        sidebar.add(kasirBtn);
 
         // Content dengan CardLayout
         content = new JPanel(new CardLayout());
@@ -278,6 +278,7 @@ public class Admin extends JFrame {
         content.add(createBukuPanel(), "buku");
         content.add(createTransaksiPanel(), "trans");
         content.add(createLaporanPenjualanPanel(), "laporan");
+        content.add(createKasirPanel(), "kasir");
 
         dashBtn.addActionListener(e -> switchPanel("dash"));
         bukuBtn.addActionListener(e -> {
@@ -289,6 +290,10 @@ public class Admin extends JFrame {
             switchPanel("trans");
         });
         laporanBtn.addActionListener(e -> switchPanel("laporan"));
+        kasirBtn.addActionListener(e -> {
+            tableKasir.setModel(KasirDAO.getAllKasir());
+            switchPanel("kasir");
+        });
 
         add(sidebar, BorderLayout.WEST);
         add(content, BorderLayout.CENTER);
@@ -342,7 +347,6 @@ public class Admin extends JFrame {
         p.setBackground(bgColor);
         p.setBorder(new EmptyBorder(30, 30, 30, 30));
 
-        // Header dengan tombol tambah buku
         JPanel headerPanel = new JPanel(new BorderLayout());
         headerPanel.setBackground(bgColor);
         JLabel titleLabel = new JLabel("<html><span style='font-size:18px; font-weight:bold;'>Manajemen Inventaris</span></html>");
@@ -422,7 +426,7 @@ public class Admin extends JFrame {
 
         JPanel headerPanel = new JPanel(new BorderLayout());
         headerPanel.setBackground(bgColor);
-        
+
         JLabel title = new JLabel("Riwayat Transaksi (Detail)");
         title.setFont(new Font("Segoe UI", Font.BOLD, 24));
         headerPanel.add(title, BorderLayout.WEST);
@@ -446,14 +450,12 @@ public class Admin extends JFrame {
         p.setBackground(bgColor);
         p.setBorder(new EmptyBorder(30, 30, 30, 30));
 
-        // Header
         JPanel header = new JPanel(new BorderLayout());
         header.setBackground(bgColor);
         JLabel title = new JLabel("Laporan Penjualan");
         title.setFont(new Font("Segoe UI", Font.BOLD, 24));
         header.add(title, BorderLayout.WEST);
 
-        // Filter area
         JPanel filterPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         filterPanel.setBackground(bgColor);
         filterPanel.add(new JLabel("Filter:"));
@@ -463,7 +465,7 @@ public class Admin extends JFrame {
         lblTotal.setFont(new Font("Segoe UI", Font.BOLD, 16));
         JLabel lblJumlahTransaksi = new JLabel("Jumlah Transaksi: 0");
         lblJumlahTransaksi.setFont(new Font("Segoe UI", Font.BOLD, 16));
-        
+
         filterPanel.add(cbFilter);
         filterPanel.add(btnFilter);
         filterPanel.add(lblTotal);
@@ -471,12 +473,10 @@ public class Admin extends JFrame {
         header.add(filterPanel, BorderLayout.SOUTH);
         p.add(header, BorderLayout.NORTH);
 
-        // Grafik bar chart
         chartPanel = new BarChartPanel("Pendapatan per Hari", new LinkedHashMap<>());
         chartPanel.setPreferredSize(new Dimension(0, 380));
         p.add(chartPanel, BorderLayout.CENTER);
 
-        // Tabel ringkasan
         String[] kolom = {"Tanggal", "Jumlah Transaksi", "Total Pendapatan"};
         modelLaporan = new DefaultTableModel(kolom, 0);
         tableLaporan = new JTable(modelLaporan);
@@ -485,7 +485,6 @@ public class Admin extends JFrame {
         scroll.setPreferredSize(new Dimension(0, 180));
         p.add(scroll, BorderLayout.SOUTH);
 
-        // Event filter
         btnFilter.addActionListener(e -> {
             String selected = (String) cbFilter.getSelectedItem();
             String filterType;
@@ -496,10 +495,92 @@ public class Admin extends JFrame {
             loadLaporanRingkasan(filterType, lblTotal, lblJumlahTransaksi);
         });
 
-        // Load data awal
         loadLaporanRingkasan("MINGGU_INI", lblTotal, lblJumlahTransaksi);
         cbFilter.setSelectedItem("Minggu Ini");
 
+        return p;
+    }
+
+    // ========== FITUR MANAJEMEN KASIR ==========
+    private JPanel createKasirPanel() {
+        JPanel p = new JPanel(new BorderLayout(0, 20));
+        p.setBackground(bgColor);
+        p.setBorder(new EmptyBorder(30, 30, 30, 30));
+
+        // Header
+        JLabel title = new JLabel("Manajemen Kasir");
+        title.setFont(new Font("Segoe UI", Font.BOLD, 24));
+        p.add(title, BorderLayout.NORTH);
+
+        // Tabel daftar kasir
+        tableKasir = new JTable(KasirDAO.getAllKasir());
+        styleTable(tableKasir);
+        p.add(new JScrollPane(tableKasir), BorderLayout.CENTER);
+
+        // Form tambah & hapus kasir
+        JPanel form = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 10));
+        form.setBackground(bgColor);
+
+        JTextField usernameField = new JTextField();
+        usernameField.setPreferredSize(new Dimension(150, 35));
+
+        JPasswordField passwordField = new JPasswordField();
+        passwordField.setPreferredSize(new Dimension(150, 35));
+
+        JButton btnTambah = new JButton("Tambah Kasir");
+        btnTambah.setPreferredSize(new Dimension(130, 35));
+        btnTambah.setBackground(accentColor);
+        btnTambah.setForeground(Color.WHITE);
+        btnTambah.setFocusPainted(false);
+
+        JButton btnHapus = new JButton("Hapus Kasir");
+        btnHapus.setPreferredSize(new Dimension(130, 35));
+        btnHapus.setBackground(new Color(192, 57, 43));
+        btnHapus.setForeground(Color.WHITE);
+        btnHapus.setFocusPainted(false);
+
+        btnTambah.addActionListener(e -> {
+            String user = usernameField.getText().trim();
+            String pass = new String(passwordField.getPassword()).trim();
+
+            if (user.isEmpty() || pass.isEmpty()) {
+                JOptionPane.showMessageDialog(this, "Username dan password tidak boleh kosong!");
+                return;
+            }
+
+            if (KasirDAO.tambahKasir(user, pass)) {
+                JOptionPane.showMessageDialog(this, "Kasir '" + user + "' berhasil ditambahkan!");
+                usernameField.setText("");
+                passwordField.setText("");
+                tableKasir.setModel(KasirDAO.getAllKasir());
+            } else {
+                JOptionPane.showMessageDialog(this, "Gagal! Username sudah digunakan.");
+            }
+        });
+
+        btnHapus.addActionListener(e -> {
+            int row = tableKasir.getSelectedRow();
+            if (row == -1) {
+                JOptionPane.showMessageDialog(this, "Pilih kasir yang ingin dihapus!");
+                return;
+            }
+            String idKasir = tableKasir.getValueAt(row, 0).toString();
+            int konfirmasi = JOptionPane.showConfirmDialog(this,
+                "Yakin hapus kasir " + idKasir + "?", "Konfirmasi", JOptionPane.YES_NO_OPTION);
+            if (konfirmasi == JOptionPane.YES_OPTION) {
+                KasirDAO.hapusKasir(idKasir);
+                tableKasir.setModel(KasirDAO.getAllKasir());
+            }
+        });
+
+        form.add(new JLabel("Username:"));
+        form.add(usernameField);
+        form.add(new JLabel("Password:"));
+        form.add(passwordField);
+        form.add(btnTambah);
+        form.add(btnHapus);
+
+        p.add(form, BorderLayout.SOUTH);
         return p;
     }
 
@@ -515,7 +596,7 @@ public class Admin extends JFrame {
             sql += " AND MONTH(tanggal) = MONTH(CURDATE()) AND YEAR(tanggal) = YEAR(CURDATE())";
         }
         sql += " GROUP BY DATE(tanggal) ORDER BY tgl ASC";
-        
+
         double totalSemua = 0;
         int jumlahSemua = 0;
         Map<String, Double> dataGrafik = new LinkedHashMap<>();
@@ -534,7 +615,7 @@ public class Admin extends JFrame {
         } catch (SQLException e) {
             e.printStackTrace();
         }
-        
+
         lblTotal.setText("Total Pendapatan: Rp " + String.format("%,d", (long)totalSemua));
         lblJumlahTransaksi.setText("Jumlah Transaksi: " + jumlahSemua);
         chartPanel.updateData(dataGrafik);
@@ -603,7 +684,6 @@ public class Admin extends JFrame {
                 return;
             }
 
-            // DIMENSI
             int leftPadding = 70;
             int rightPadding = 40;
             int topPadding = 60;
@@ -615,21 +695,17 @@ public class Admin extends JFrame {
             int x0 = leftPadding;
             int y0 = getHeight() - bottomPadding;
 
-            // TITLE
             g2.setFont(new Font("Segoe UI", Font.BOLD, 20));
             g2.setColor(new Color(40, 40, 40));
             g2.drawString(title, leftPadding, 35);
 
-            // NILAI MAKSIMUM
             double max = data.values().stream().max(Double::compare).orElse(1.0);
             max *= 1.4;
 
-            // AXIS
             g2.setColor(Color.DARK_GRAY);
             g2.drawLine(x0, topPadding, x0, y0);
             g2.drawLine(x0, y0, x0 + chartWidth, y0);
 
-            // GRID (tanpa label sumbu Y)
             g2.setFont(new Font("Segoe UI", Font.PLAIN, 10));
             int gridCount = 5;
             for (int i = 0; i <= gridCount; i++) {
@@ -638,7 +714,6 @@ public class Admin extends JFrame {
                 g2.drawLine(x0, y, x0 + chartWidth, y);
             }
 
-            // BAR
             int totalBar = data.size();
             int space = 30;
             int barWidth = (chartWidth - (space * (totalBar + 1))) / totalBar;
@@ -651,15 +726,12 @@ public class Admin extends JFrame {
                 if (barHeight < 2) barHeight = 2;
                 int barY = y0 - barHeight;
 
-                // Shadow
                 g2.setColor(new Color(0, 0, 0, 30));
                 g2.fillRoundRect(currentX + 3, barY + 3, barWidth, barHeight, 12, 12);
 
-                // Main bar
                 g2.setColor(primaryColor);
                 g2.fillRoundRect(currentX, barY, barWidth, barHeight, 12, 12);
 
-                // VALUE DI ATAS BAR
                 g2.setFont(new Font("Segoe UI", Font.BOLD, 11));
                 g2.setColor(new Color(50, 50, 50));
                 String valueText = formatRupiah((long) value);
@@ -668,7 +740,6 @@ public class Admin extends JFrame {
                     currentX + (barWidth / 2) - (textWidth / 2),
                     barY - 5);
 
-                // LABEL TANGGAL
                 g2.setFont(new Font("Segoe UI", Font.PLAIN, 11));
                 String date = entry.getKey();
                 if (date.length() >= 10) date = date.substring(5);
