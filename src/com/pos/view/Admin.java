@@ -568,9 +568,14 @@ public class Admin extends JFrame {
             int konfirmasi = JOptionPane.showConfirmDialog(this,
                 "Yakin hapus kasir " + idKasir + "?", "Konfirmasi", JOptionPane.YES_NO_OPTION);
             if (konfirmasi == JOptionPane.YES_OPTION) {
-                KasirDAO.hapusKasir(idKasir);
-                tableKasir.setModel(KasirDAO.getAllKasir());
-            }
+    boolean berhasil = KasirDAO.hapusKasir(idKasir);
+    if (berhasil) {
+        JOptionPane.showMessageDialog(this, "Kasir berhasil dinonaktifkan!");
+        tableKasir.setModel(KasirDAO.getAllKasir());
+    } else {
+        JOptionPane.showMessageDialog(this, "Gagal menonaktifkan kasir!");
+    }
+}
         });
 
         form.add(new JLabel("Username:"));

@@ -55,13 +55,14 @@ public class KasirDAO {
 
     // Ambil semua kasir untuk ditampilkan di tabel
     public static DefaultTableModel getAllKasir() {
+        
         DefaultTableModel model = new DefaultTableModel(
             new String[]{"ID Kasir", "Username"}, 0
         ) {
             @Override
             public boolean isCellEditable(int r, int c) { return false; }
         };
-        String sql = "SELECT id_kasir, username FROM kasir";
+        String sql = "SELECT id_kasir, username FROM kasir WHERE is_active = 1";
         try (Connection conn = Koneksi.getConnection();
              Statement stmt = conn.createStatement();
              ResultSet rs = stmt.executeQuery(sql)) {
@@ -79,14 +80,14 @@ public class KasirDAO {
 
     // Hapus kasir berdasarkan ID
     public static boolean hapusKasir(String idKasir) {
-        String sql = "DELETE FROM kasir WHERE id_kasir = ?";
-        try (Connection conn = Koneksi.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, idKasir);
-            return ps.executeUpdate() > 0;
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        return false;
+    String sql = "UPDATE kasir SET is_active = 0 WHERE id_kasir = ?";
+    try (Connection conn = Koneksi.getConnection();
+         PreparedStatement ps = conn.prepareStatement(sql)) {
+        ps.setString(1, idKasir);
+        return ps.executeUpdate() > 0;
+    } catch (Exception e) {
+        e.printStackTrace();
     }
+    return false;
+}
 }

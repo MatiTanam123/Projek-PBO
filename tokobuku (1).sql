@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: localhost:3306
--- Generation Time: Apr 10, 2026 at 02:02 AM
+-- Generation Time: May 15, 2026 at 07:29 AM
 -- Server version: 8.0.43
 -- PHP Version: 8.1.10
 
@@ -59,13 +59,13 @@ CREATE TABLE `buku` (
 --
 
 INSERT INTO `buku` (`isbn`, `judul`, `harga`, `kategori`, `stok`) VALUES
-('9780132306331', 'Calculus', '565000.00', 'Mathematika', 3),
+('9780132306331', 'Calculus', '565000.00', 'Mathematika', 7),
 ('9780199291151', 'The Selfish Gene', '210000.00', 'Sains', 9),
 ('9780316055437', 'The Goldfinch', '230000.00', 'Fiksi', 6),
 ('9780374275631', 'Thinking, Fast and Slow', '240000.00', 'Non-Fiksi', 8),
 ('9780375508325', 'Cosmos', '150000.00', 'Sains', 10),
-('9780385539258', 'A Little Life', '190000.00', 'Fiksi', 15),
-('9780767905923', 'Tuesdays with Morrie: An Old Man, a Young Man, and Life\'s Greatest Lesson', '210000.00', 'Non-Fiksi', 5),
+('9780385539258', 'A Little Life', '190000.00', 'Fiksi', 14),
+('9780767905923', 'Tuesdays with Morrie: An Old Man, a Young Man, and Life\'s Greatest Lesson', '210000.00', 'Non-Fiksi', 4),
 ('9781423160915', 'The Sword of Summer', '120000.00', 'Fiksi', 7),
 ('9781451673319', 'All the Light We Cannot See', '250000.00', 'Fiksi', 10),
 ('9781476746586', 'Fahrenheit 451', '165000.00', 'Fiksi', 8);
@@ -84,6 +84,15 @@ CREATE TABLE `item_belanja` (
   `subtotal` decimal(12,2) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
+--
+-- Dumping data for table `item_belanja`
+--
+
+INSERT INTO `item_belanja` (`id_item`, `id_transaksi`, `isbn`, `qty`, `subtotal`) VALUES
+('ITM177875832291824', 'TRK20260514183202', '9780385539258', 1, '190000.00'),
+('ITM1778760245318681', 'TRK20260514190405', '9780132306331', 1, '565000.00'),
+('ITM1778760245320161', 'TRK20260514190405', '9780767905923', 1, '210000.00');
+
 -- --------------------------------------------------------
 
 --
@@ -93,8 +102,16 @@ CREATE TABLE `item_belanja` (
 CREATE TABLE `kasir` (
   `id_kasir` varchar(20) NOT NULL,
   `username` varchar(50) NOT NULL,
-  `password` varchar(255) NOT NULL
+  `password` varchar(255) NOT NULL,
+  `is_active` tinyint(1) DEFAULT '1'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+--
+-- Dumping data for table `kasir`
+--
+
+INSERT INTO `kasir` (`id_kasir`, `username`, `password`, `is_active`) VALUES
+('KSR001', 'Jeremy', 'kasir123', 0);
 
 -- --------------------------------------------------------
 
@@ -110,6 +127,14 @@ CREATE TABLE `transaksi` (
   `nominal_bayar` decimal(12,2) NOT NULL,
   `id_kasir` varchar(20) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+--
+-- Dumping data for table `transaksi`
+--
+
+INSERT INTO `transaksi` (`id_transaksi`, `tanggal`, `total_harga`, `metode_bayar`, `nominal_bayar`, `id_kasir`) VALUES
+('TRK20260514183202', '2026-05-14 18:32:02', '190000.00', 'TUNAI', '200000.00', 'KSR001'),
+('TRK20260514190405', '2026-05-14 19:04:05', '775000.00', 'TUNAI', '780000.00', 'KSR001');
 
 --
 -- Indexes for dumped tables

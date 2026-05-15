@@ -123,7 +123,7 @@ public class Signup extends JFrame {
         pstAdmin.close();
 
         // Cek tabel kasir
-        String sqlKasir = "SELECT id_kasir, username FROM kasir WHERE username=? AND password=?";
+        String sqlKasir = "SELECT * FROM kasir WHERE username = ? AND password = ? AND is_active = 1";
         PreparedStatement pstKasir = conn.prepareStatement(sqlKasir);
         pstKasir.setString(1, user);
         pstKasir.setString(2, pass);
