@@ -6,62 +6,84 @@ import javax.swing.table.DefaultTableModel;
 
 public class KasirDAO {
 
-    // Generate ID otomatis: KSR001, KSR002, dst.
+    // Generate ID otomatis (Kompatibel penuh dengan SQLite)
     public static String generateId() {
-        String sql = "SELECT id_kasir FROM kasir ORDER BY id_kasir DESC LIMIT 1";
+        String sql = "SELECT id_kasir FROM kasir ORDER BY CAST(SUBSTR(id_kasir, 4) AS INTEGER) DESC LIMIT 1";
         try (Connection conn = Koneksi.getConnection();
              Statement stmt = conn.createStatement();
              ResultSet rs = stmt.executeQuery(sql)) {
             if (rs.next()) {
-                String last = rs.getString("id_kasir"); // misal "KSR003"
-                int num = Integer.parseInt(last.substring(3)) + 1;
-                return String.format("KSR%03d", num);
+                String last = rs.getString("id_kasir");
+                if (last != null && last.length() >= 4) {
+                    int num = Integer.parseInt(last.substring(3)) + 1;
+                    return String.format("KSR%03d", num);
+                }
             }
         } catch (Exception e) {
             e.printStackTrace();
         }
-        return "KSR001"; // default jika tabel masih kosong
+        return "KSR001"; // Default jika tabel kosong
     }
 
-    // Cek apakah username sudah dipakai
+    // Cek apakah username sudah dipakai (Hanya mengecek kasir yang aktif)
     public static boolean usernameExists(String username) {
-        String sql = "SELECT id_kasir FROM kasir WHERE username = ?";
+        if (username == null || username.trim().isEmpty()) {
+            return true;
+        }
+        
+        String sql = "SELECT id_kasir FROM kasir WHERE LOWER(TRIM(username)) = LOWER(TRIM(?)) AND is_active = 1";
         try (Connection conn = Koneksi.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, username);
-            return ps.executeQuery().next();
+            
+            ps.setString(1, username.trim());
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next();
+            }
         } catch (Exception e) {
             e.printStackTrace();
+            return true;
         }
-        return false;
     }
 
     // Tambah kasir baru
     public static boolean tambahKasir(String username, String password) {
-        if (usernameExists(username)) return false;
+        if (username == null || username.trim().isEmpty() || 
+            password == null || password.trim().isEmpty()) {
+            return false;
+        }
 
-        String sql = "INSERT INTO kasir (id_kasir, username, password) VALUES (?, ?, ?)";
+        if (usernameExists(username)) {
+            return false;
+        }
+
+        // Trik Krusial: Ambil ID Baru SEBELUM kueri INSERT menyiapkan koneksi baru
+        String nextId = generateId();
+
+        String sql = "INSERT INTO kasir (id_kasir, username, password, is_active) VALUES (?, ?, ?, 1)";
+        
         try (Connection conn = Koneksi.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, generateId());
-            ps.setString(2, username);
-            ps.setString(3, password);
+            
+            ps.setString(1, nextId); // Menggunakan variabel string independen
+            ps.setString(2, username.trim());
+            ps.setString(3, password.trim());
+            
             return ps.executeUpdate() > 0;
         } catch (Exception e) {
             e.printStackTrace();
+            return false;
         }
-        return false;
     }
 
-    // Ambil semua kasir untuk ditampilkan di tabel
+    // Ambil semua kasir aktif untuk ditampilkan di tabel
     public static DefaultTableModel getAllKasir() {
-        
         DefaultTableModel model = new DefaultTableModel(
             new String[]{"ID Kasir", "Username"}, 0
         ) {
             @Override
             public boolean isCellEditable(int r, int c) { return false; }
         };
+        
         String sql = "SELECT id_kasir, username FROM kasir WHERE is_active = 1";
         try (Connection conn = Koneksi.getConnection();
              Statement stmt = conn.createStatement();
@@ -78,16 +100,16 @@ public class KasirDAO {
         return model;
     }
 
-    // Hapus kasir berdasarkan ID
+    // Hapus kasir berdasarkan ID (Soft Delete)
     public static boolean hapusKasir(String idKasir) {
-    String sql = "UPDATE kasir SET is_active = 0 WHERE id_kasir = ?";
-    try (Connection conn = Koneksi.getConnection();
-         PreparedStatement ps = conn.prepareStatement(sql)) {
-        ps.setString(1, idKasir);
-        return ps.executeUpdate() > 0;
-    } catch (Exception e) {
-        e.printStackTrace();
+        String sql = "UPDATE kasir SET is_active = 0 WHERE id_kasir = ?";
+        try (Connection conn = Koneksi.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, idKasir);
+            return ps.executeUpdate() > 0;
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return false;
     }
-    return false;
-}
 }

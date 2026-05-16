@@ -18,6 +18,8 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.LinkedHashMap;
 import java.util.Map;
+
+import com.pos.config.Koneksi;
 import com.pos.dao.KasirDAO;
 
 import javax.swing.BorderFactory;
@@ -51,13 +53,8 @@ public class Admin extends JFrame {
     Color warningColor = new Color(230, 126, 34);
 
     private Connection connectDB() {
-        try {
-            return DriverManager.getConnection("jdbc:mysql://localhost:3306/tokobuku", "root", "");
-        } catch (Exception e) {
-            e.printStackTrace();
-            return null;
-        }
-    }
+    return Koneksi.getConnection();   // Pakai koneksi SQLite yang sudah berhasil
+}
 
     private DefaultTableModel getBukuData() {
         DefaultTableModel model = new DefaultTableModel(new String[]{"ISBN", "Judul", "Harga", "Kategori", "Stok"}, 0);
@@ -540,23 +537,30 @@ public class Admin extends JFrame {
         btnHapus.setFocusPainted(false);
 
         btnTambah.addActionListener(e -> {
-            String user = usernameField.getText().trim();
-            String pass = new String(passwordField.getPassword()).trim();
+    String user = usernameField.getText().trim();
+    String pass = new String(passwordField.getPassword()).trim();
 
-            if (user.isEmpty() || pass.isEmpty()) {
-                JOptionPane.showMessageDialog(this, "Username dan password tidak boleh kosong!");
-                return;
-            }
+    if (user.isEmpty() || pass.isEmpty()) {
+        JOptionPane.showMessageDialog(this, "Username dan password tidak boleh kosong!", "Peringatan", JOptionPane.WARNING_MESSAGE);
+        return;
+    }
 
-            if (KasirDAO.tambahKasir(user, pass)) {
-                JOptionPane.showMessageDialog(this, "Kasir '" + user + "' berhasil ditambahkan!");
-                usernameField.setText("");
-                passwordField.setText("");
-                tableKasir.setModel(KasirDAO.getAllKasir());
-            } else {
-                JOptionPane.showMessageDialog(this, "Gagal! Username sudah digunakan.");
-            }
-        });
+    boolean berhasil = KasirDAO.tambahKasir(user, pass);
+    
+    if (berhasil) {
+        JOptionPane.showMessageDialog(this, "Kasir '" + user + "' berhasil ditambahkan!", "Sukses", JOptionPane.INFORMATION_MESSAGE);
+        usernameField.setText("");
+        passwordField.setText("");
+        tableKasir.setModel(KasirDAO.getAllKasir());
+    } else {
+        // Cek apakah karena username sudah ada atau error lain
+        if (KasirDAO.usernameExists(user)) {
+            JOptionPane.showMessageDialog(this, "Gagal! Username '" + user + "' sudah digunakan.", "Error", JOptionPane.ERROR_MESSAGE);
+        } else {
+            JOptionPane.showMessageDialog(this, "Gagal menambahkan kasir. Silakan coba lagi.", "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+});
 
         btnHapus.addActionListener(e -> {
             int row = tableKasir.getSelectedRow();
