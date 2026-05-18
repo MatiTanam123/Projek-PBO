@@ -11,7 +11,7 @@ public class Koneksi {
     try {
         if (koneksi == null || koneksi.isClosed()) {
             
-            String url = "jdbc:sqlite:C:/TokoBuku_PBO/tokobuku.db";
+            String url = "jdbc:sqlite:D:/Tugas Kelompok/TEST PBO APK/tokobuku.db";
             
             Class.forName("org.sqlite.JDBC");
             koneksi = DriverManager.getConnection(url);
